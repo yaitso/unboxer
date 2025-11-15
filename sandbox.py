@@ -37,7 +37,7 @@ def sandbox_docker(fn: str, kwargs: dict) -> Result[dict, str]:
             input=payload,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=15,
         )
     except Exception as e:  # pragma: no cover
         return Err(f"docker execution failed: {str(e)}")
