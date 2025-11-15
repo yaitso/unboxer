@@ -5,5 +5,5 @@
 **/.DS_Store
 **/.venv
 **/.ruff_cache
-**/unboxer
-**/unboxer.egg-info
+**/un.egg-info
+verifiers/
