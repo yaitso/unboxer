@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = ["click>=8.3.0", "pytest", "result", "xxhash", "verifiers[rl]"]
 
 [project.scripts]
-rew = "rew:main"
+un = "unboxer:main"
 
 [tool.uv]
 package = true
