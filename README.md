@@ -1,4 +1,4 @@
-# rewardly
+# unboxer
 
 _somewhat_ theoretically grounded RL environment idea. couple months back, while being very ARC-pilled and Chollet-maxxed, i came up with an alternative definition of intelligence.
 
