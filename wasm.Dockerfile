@@ -8,5 +8,6 @@ RUN apt-get update && apt-get install -y curl ca-certificates bzip2 && \
     curl -L https://github.com/pyodide/pyodide/releases/download/0.29.0/pyodide-core-0.29.0.tar.bz2 | tar xj
 
 COPY wasm.js ./wasm.js
+COPY sandbox_run.py ./sandbox_run.py
 
 ENTRYPOINT ["sh", "-c", "cat > /json && node wasm.js"]

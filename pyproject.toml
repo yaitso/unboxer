@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "blackbox function reverse engineering RL environment"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["click", "pytest", "result", "xxhash", "verifiers[rl]"]
+dependencies = ["click", "pytest", "result", "xxhash", "verifiers[rl]", "python-dotenv"]
 
 [project.scripts]
 un = "un:main"
@@ -17,7 +17,7 @@ override-dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["un"]
+py-modules = ["un", "sandbox"]
 
 [tool.pytest.ini_options]
 python_files = ["*.test.py", "test_*.py"]

@@ -3,25 +3,20 @@ const { loadPyodide } = require('/opt/pyodide/pyodide/pyodide.js');
 
 async function main() {
     const data = JSON.parse(readFileSync('/json', 'utf8'));
+    const sandboxRunCode = readFileSync('/sandbox_run.py', 'utf8');
 
     const pyodide = await loadPyodide({
         indexURL: '/opt/pyodide/pyodide'
     });
 
     const pythonCode = `
-from math import *
+${sandboxRunCode}
+
+data = ${JSON.stringify(data)}
+result = run(data)
+
 from json import dumps
-
-${data.fn}
-
-try:
-    if "blackbox" not in globals():
-        print(dumps({"error": "function \`blackbox\` not defined"}))
-    else:
-        result = blackbox(**${JSON.stringify(data.kwargs)})
-        print(dumps({"result": result}))
-except Exception as e:
-    print(dumps({"error": str(e)}))
+print(dumps(result))
 `;
 
     let stdout = [];

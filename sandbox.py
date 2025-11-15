@@ -5,13 +5,24 @@ from os import environ
 from pathlib import Path
 
 
-def build():
+def build_sandbox_docker():
     script_dir = Path(__file__).parent
-    run(["docker", "build", "-t", "sandbox", "-f", "sandbox.Dockerfile", "."], cwd=script_dir)
-    run(["docker", "build", "-t", "wasm", "-f", "wasm.Dockerfile", "."], cwd=script_dir)
+    run(
+        ["docker", "build", "-t", "sandbox", "-f", "sandbox.Dockerfile", "."],
+        cwd=script_dir,
+    )
+
+
+def build_wasm_docker():
+    script_dir = Path(__file__).parent
+    run(
+        ["docker", "build", "-t", "wasm", "-f", "wasm.Dockerfile", "."],
+        cwd=script_dir,
+    )
 
 
 def sandbox_docker(fn: str, kwargs: dict) -> Result[dict, str]:
+    build_sandbox_docker()
     payload = dumps({"fn": fn, "kwargs": kwargs})
 
     try:
@@ -51,6 +62,7 @@ def sandbox_docker(fn: str, kwargs: dict) -> Result[dict, str]:
 
 
 def sandbox_wasm(fn: str, kwargs: dict) -> Result[dict, str]:
+    build_wasm_docker()
     payload = dumps({"fn": fn, "kwargs": kwargs})
 
     try:
@@ -81,23 +93,51 @@ def sandbox_wasm(fn: str, kwargs: dict) -> Result[dict, str]:
         )
 
 
-def sandbox(fn: str, kwargs: dict) -> Result[dict, str]:
-    mode = environ.get("SANDBOX_USE", "docker")
+def sandbox_python(fn: str, kwargs: dict) -> Result[dict, str]:
+    script_dir = Path(__file__).parent
+    sandbox_run_code = (script_dir / "sandbox_run.py").read_text()
 
-    if mode == "wasm":
-        return sandbox_wasm(fn, kwargs)
-    elif mode == "docker":
-        return sandbox_docker(fn, kwargs)
-    else:
-        return Err(f"unknown sandbox mode: {mode}")
+    payload = dumps({"fn": fn, "kwargs": kwargs})
+
+    try:
+        result = run(
+            ["python3", "-c", sandbox_run_code],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except Exception as e:
+        return Err(f"python execution failed: {str(e)}")
+
+    try:
+        data = loads(result.stdout)
+        if "error" in data:
+            return Err(data["error"])
+        return Ok({"output": data["result"]})
+    except JSONDecodeError:
+        return Err(
+            f"json decode failed - stderr: {result.stderr}, stdout: {result.stdout}"
+        )
+
+
+def sandbox(fn: str, kwargs: dict) -> Result[dict, str]:
+    mode = environ.get("SANDBOX_USE", "python")
+
+    match mode:
+        case "python":
+            return sandbox_python(fn, kwargs)
+        case "wasm":
+            return sandbox_wasm(fn, kwargs)
+        case "docker":
+            return sandbox_docker(fn, kwargs)
+        case _:
+            return Err(f"unknown sandbox mode: {mode}")
 
 
 if __name__ == "__main__":
-    build()
-
     fn = """
 def blackbox(a: float, b: float):
-    # snake activation function
     return a + (sin(a)*b)**2
 """
 
