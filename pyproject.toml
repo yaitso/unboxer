@@ -1,10 +1,10 @@
 [project]
-name = "rewarding"
+name = "unboxer"
 version = "0.1.0"
-description = "Add your description here"
+description = "blackbox function reverse engineering RL environment"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["click>=8.3.0", "pytest", "result", "xxhash", "verifiers[rl]"]
+dependencies = ["click", "pytest", "result", "xxhash", "verifiers[rl]"]
 
 [project.scripts]
 un = "unboxer:main"
@@ -17,7 +17,7 @@ override-dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["rewarding"]
+packages = ["unboxer"]
 
 [tool.pytest.ini_options]
 python_files = ["*.test.py", "test_*.py"]

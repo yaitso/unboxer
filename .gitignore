@@ -5,5 +5,5 @@
 **/.DS_Store
 **/.venv
 **/.ruff_cache
-**/rewarding
-**/rewarding.egg-info
+**/unboxer
+**/unboxer.egg-info
