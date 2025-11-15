@@ -2,11 +2,13 @@ from json import JSONDecodeError, loads, dumps
 from subprocess import run
 from result import Result, Ok, Err
 from os import environ
+from pathlib import Path
 
 
 def build():
-    run(["docker", "build", "-t", "sandbox", "-f", "sandbox.Dockerfile", "."])
-    run(["docker", "build", "-t", "wasm", "-f", "wasm.Dockerfile", "."])
+    script_dir = Path(__file__).parent
+    run(["docker", "build", "-t", "sandbox", "-f", "sandbox.Dockerfile", "."], cwd=script_dir)
+    run(["docker", "build", "-t", "wasm", "-f", "wasm.Dockerfile", "."], cwd=script_dir)
 
 
 def sandbox_docker(fn: str, kwargs: dict) -> Result[dict, str]:
