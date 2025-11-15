@@ -17,7 +17,7 @@ override-dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["unboxer"]
+py-modules = ["unboxer"]
 
 [tool.pytest.ini_options]
 python_files = ["*.test.py", "test_*.py"]
