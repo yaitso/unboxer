@@ -88,8 +88,8 @@ def blackbox():
 """,
             {},
         )
-        assert result.is_ok()
-        assert "error" in result.ok()
+        assert result.is_err()
+        assert "timed out" in result.err()
 
 
 class TestSandboxFileSystem:
