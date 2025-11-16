@@ -74,12 +74,12 @@ def train_unboxer():
     from trainer import train
 
     os.environ["NCCL_DEBUG"] = "WARN"
+    os.environ["NCCL_SOCKET_IFNAME"] = "lo"
 
     print("starting vLLM inference server...")
     vllm_process = subprocess.Popen(
-        ["vf-vllm", "--model", "Qwen/Qwen3-0.6B"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        ["vf-vllm", "Qwen/Qwen3-0.6B"],
+        env=os.environ.copy(),
     )
 
     time.sleep(10)
