@@ -30,8 +30,16 @@ class RolloutsDB:
                     rollout_name TEXT NOT NULL,
                     blackbox TEXT NOT NULL,
                     reward REAL DEFAULT 0.0,
+                    solved BOOLEAN DEFAULT FALSE,
+                    num_turns INTEGER DEFAULT 0,
+                    trajectory JSONB DEFAULT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            await conn.execute("""
+                CREATE INDEX idx_rollouts_train_run ON unboxer.rollouts(train_run);
+                CREATE INDEX idx_rollouts_solved ON unboxer.rollouts(solved);
+                CREATE INDEX idx_rollouts_created_at ON unboxer.rollouts(created_at DESC);
             """)
         finally:
             await conn.close()
@@ -54,8 +62,16 @@ class RolloutsDB:
                     rollout_name TEXT NOT NULL,
                     blackbox TEXT NOT NULL,
                     reward REAL DEFAULT 0.0,
+                    solved BOOLEAN DEFAULT FALSE,
+                    num_turns INTEGER DEFAULT 0,
+                    trajectory JSONB DEFAULT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_rollouts_train_run ON unboxer.rollouts(train_run);
+                CREATE INDEX IF NOT EXISTS idx_rollouts_solved ON unboxer.rollouts(solved);
+                CREATE INDEX IF NOT EXISTS idx_rollouts_created_at ON unboxer.rollouts(created_at DESC);
             """)
 
     async def add_rollout(
@@ -88,6 +104,26 @@ class RolloutsDB:
             await conn.execute(
                 "UPDATE unboxer.rollouts SET reward = $1 WHERE id = $2",
                 reward,
+                rollout_id,
+            )
+
+    async def update_trajectory(
+        self,
+        rollout_id: int,
+        trajectory: list,
+        num_turns: int,
+        solved: bool,
+    ):
+        import json
+
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE unboxer.rollouts 
+                   SET trajectory = $1, num_turns = $2, solved = $3 
+                   WHERE id = $4""",
+                json.dumps(trajectory),
+                num_turns,
+                solved,
                 rollout_id,
             )
 

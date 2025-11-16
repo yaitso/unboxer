@@ -25,19 +25,28 @@ CONSTRAINTS:
 def complexity_explanation(complexity: dict, step: int) -> str:
     """explain complexity constraints based on train step"""
     examples = """
-examples of valid functions:
-- def blackbox(x): return sin(x)  # 1 op, 0 holes, 1 arg
-- def blackbox(y): return y**y    # 1 op, 0 holes, 1 arg (arg reuse)
+COUNTING RULES:
+- each operator (+, -, *, /, **) counts as 1 op
+- each math function (sin, cos, exp, sqrt, etc) counts as 1 op
+- constants are holes if not 0 or 1
+- arg reuse (x**x, y/y) is allowed and counts as 1 arg
 
-NOT allowed:
-- def blackbox(z): return z**2    # 2 is a constant hole"""
+EXAMPLES (num_ops, num_holes, num_args):
+✓ def blackbox(x): return sin(x)         # 1 op, 0 holes, 1 arg
+✓ def blackbox(y): return y**y           # 1 op, 0 holes, 1 arg
+✓ def blackbox(x): return x + $a$        # 1 op, 1 hole, 1 arg
+✓ def blackbox(x, y): return x + y       # 1 op, 0 holes, 2 args
+✓ def blackbox(x, y): return x * sin(y)  # 2 ops, 0 holes, 2 args
+✓ def blackbox(x): return (x + $a$) * $b$  # 2 ops, 2 holes, 1 arg
 
-    knobs = f"""COMPLEXITY KNOBS:
-1. num_ops: count of operators + math functions (e.g., +, **, sin, cos)
-2. num_holes: typed placeholders marked with $name$ syntax
-3. num_args: number of function arguments
+✗ def blackbox(x): return exp(x) + x     # 2 ops (should be 1)
+✗ def blackbox(x, y): return (x+y)*(x-y) # 3 ops (should be 1)
+✗ def blackbox(x): return x * 3.6        # has hole but hole not marked with $name$
+✗ def blackbox(x): return sin(cos(x))    # 2 ops nested (should be 1)"""
 
-current complexity: {json.dumps(complexity)}"""
+    knobs = f"""
+CURRENT COMPLEXITY TARGET: {json.dumps(complexity)}
+YOU MUST generate a function matching EXACTLY these counts."""
 
     return f"{examples}\n{knobs}"
 

@@ -45,6 +45,7 @@ class UnboxerEnv(vf.MultiTurnEnv):
     ):
         super().__init__(max_turns=max_turns, **kwargs)
         from os import environ
+
         self.max_turns = max_turns
         self.train_step = train_step
         self.rollouts_per_step = rollouts_per_step
@@ -113,6 +114,43 @@ class UnboxerEnv(vf.MultiTurnEnv):
 
         return data
 
+    def validate_complexity(self, fn: str, complexity: dict) -> bool:
+        """validate that generated function matches complexity constraints"""
+        import re
+
+        ops = [
+            "+",
+            "-",
+            "*",
+            "/",
+            "**",
+            "sin",
+            "cos",
+            "tan",
+            "exp",
+            "log",
+            "sqrt",
+            "abs",
+        ]
+
+        op_count = 0
+        for op in ops:
+            if op in ["**"]:
+                op_count += fn.count(op)
+            else:
+                op_count += len(re.findall(rf"\b{re.escape(op)}\b", fn))
+
+        hole_count = len(re.findall(r"\$\w+\$", fn))
+
+        arg_match = re.search(r"def blackbox\((.*?)\)", fn)
+        arg_count = len(arg_match.group(1).split(",")) if arg_match else 0
+
+        return (
+            op_count == complexity["num_ops"]
+            and hole_count == complexity["num_holes"]
+            and arg_count == complexity["num_args"]
+        )
+
     async def generate_blackbox_fn(
         self, complexity: dict, client: Optional[AsyncOpenAI] = None
     ) -> tuple[str, dict, dict, list, dict]:
@@ -121,21 +159,29 @@ class UnboxerEnv(vf.MultiTurnEnv):
         client = await self.get_or_create_client(client)
 
         rollout_window = await self.db.get_rollout_window(window_size=100)
-        prompt = prompts.new_function_prompt(complexity, rollout_window)
 
-        response = await client.chat.completions.create(
-            model="anthropic/claude-haiku-4.5",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
-        )
+        for attempt in range(3):
+            prompt = prompts.new_function_prompt(complexity, rollout_window)
 
-        content = response.choices[0].message.content
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            data = json.loads(content[content.find("{") : content.rfind("}") + 1])
+            response = await client.chat.completions.create(
+                model="anthropic/claude-haiku-4.5",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.8,
+            )
 
-        blackbox_fn_template = data["fn"]
+            content = response.choices[0].message.content
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError:
+                data = json.loads(content[content.find("{") : content.rfind("}") + 1])
+
+            blackbox_fn_template = data["fn"]
+
+            if self.validate_complexity(blackbox_fn_template, complexity):
+                break
+            elif attempt == 2:
+                pass
+
         kwargs_spec_str = data["kwargs"]
         holes_spec_str = data.get("holes", {})
 
@@ -172,7 +218,10 @@ class UnboxerEnv(vf.MultiTurnEnv):
             kwargs_spec,
             holes_spec,
             n_input_output_pairs,
-            {"n_plus_one_input": n_plus_one_input, "n_plus_one_output": n_plus_one_output},
+            {
+                "n_plus_one_input": n_plus_one_input,
+                "n_plus_one_output": n_plus_one_output,
+            },
         )
 
     async def setup_state(self, state: State, **kwargs) -> State:
@@ -221,6 +270,25 @@ class UnboxerEnv(vf.MultiTurnEnv):
             train_commit=self.train_commit,
         )
         state["rollout_id"] = rollout_id
+
+        game_prompt = f"""this is an interactive reverse engineering game playing which you will be trained with RL
+at the start of a rollout you have budget of {self.max_turns} turns
+each time you call tool it is decremented by 1
+if it reaches 0 episode is terminated and you get 0 reward
+if you guess correctly before your budget reaches 0 then your reward is leftover budget
+so keep track of budget you have left to ensure you will be able to call <submit>
+
+if you fail to predict proper output we tell you so in tool response, provide actual output value, and give new input to predict, and we repeat that until rollout ends
+
+given the list of {len(n_input_output_pairs)} input-output pairs: {n_input_output_pairs}
+your task is to reverse engineer blackbox function that produced them and predict output for next input: {next_data["n_plus_one_input"]}
+
+you have access to 3 tools:
+1. bash: execute bash command in persistent sandbox vm (only if remote sandbox enabled)
+2. eval: execute python function with given kwargs in isolated environment
+3. submit: submit your predicted output along with hypothesis function"""
+
+        state["prompt"] = [{"role": "user", "content": game_prompt}]
 
         return state
 
@@ -317,7 +385,9 @@ class UnboxerEnv(vf.MultiTurnEnv):
                     )
                 else:
                     n_plus_one_input = sample_kwargs(state["kwargs_spec"])
-                    expected_result = Sandbox.local(state["blackbox_fn"], n_plus_one_input)
+                    expected_result = Sandbox.local(
+                        state["blackbox_fn"], n_plus_one_input
+                    )
                     n_plus_one_output = (
                         round(expected_result.ok()["output"], 1)
                         if expected_result.is_ok()
@@ -339,6 +409,13 @@ class UnboxerEnv(vf.MultiTurnEnv):
                 break
 
         if state.get("solved") or state["budget"] <= 0:
+            await self.db.update_trajectory(
+                rollout_id=state["rollout_id"],
+                trajectory=state["completion"],
+                num_turns=state.get("turn", 0),
+                solved=state.get("solved", False),
+            )
+
             if state["sandbox"]:
                 await state["sandbox"].destroy()
 

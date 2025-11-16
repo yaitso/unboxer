@@ -10,6 +10,7 @@ import asyncio
 async def run_migration():
     """run database migration once before training"""
     from db import RolloutsDB
+
     dsn = environ.get("POSTGRES")
     if dsn:
         await RolloutsDB.migrate(dsn=dsn)
