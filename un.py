@@ -96,7 +96,7 @@ def train():
     script_dir = Path(__file__).parent
 
     run(["git", "add", "."], cwd=script_dir, check=True)
-    run(["git", "commit", "-m", "yaitso"], cwd=script_dir, check=True)
+    commit_result = run(["git", "commit", "-m", "yaitso"], cwd=script_dir, check=False)
 
     result = run(
         ["git", "rev-parse", "HEAD"],
