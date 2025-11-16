@@ -52,6 +52,9 @@ image = (
             "un.egg-info",
             "verifiers",
             "proxy/target",
+            "secret.nu",
+            ".vscode",
+            ".claude",
         ],
     )
 )
@@ -72,6 +75,7 @@ def train_unboxer():
     load_dotenv()
 
     import wandb
+
     wandb.login(key=os.environ["WANDB_TOKEN"])
 
     os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
@@ -95,7 +99,11 @@ def train_unboxer():
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     postgres_val = os.environ.get("POSTGRES", "NOT_SET")
-    print(f"POSTGRES env var: {postgres_val[:50]}..." if len(postgres_val) > 50 else f"POSTGRES env var: {postgres_val}")
+    print(
+        f"POSTGRES env var: {postgres_val[:50]}..."
+        if len(postgres_val) > 50
+        else f"POSTGRES env var: {postgres_val}"
+    )
 
     try:
         result = train("configs/unboxer.toml")
