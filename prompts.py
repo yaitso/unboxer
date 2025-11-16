@@ -120,7 +120,7 @@ def oai_tools() -> list:
                     "properties": {
                         "fn": {
                             "type": "string",
-                            "description": "python function definition to execute",
+                            "description": "complete python function definition starting with 'def blackbox' including signature and return statement, NOT just an expression",
                         },
                         "kwargs": {
                             "type": "string",
@@ -141,7 +141,7 @@ def oai_tools() -> list:
                     "properties": {
                         "fn": {
                             "type": "string",
-                            "description": "your hypothesis function definition",
+                            "description": "complete python function definition starting with 'def blackbox' including signature and return statement, NOT just an expression",
                         },
                         "output": {
                             "type": "number",

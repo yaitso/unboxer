@@ -286,7 +286,13 @@ your task is to reverse engineer blackbox function that produced them and predic
 you have access to 3 tools:
 1. bash: execute bash command in persistent sandbox vm (only if remote sandbox enabled)
 2. eval: execute python function with given kwargs in isolated environment
-3. submit: submit your predicted output along with hypothesis function"""
+3. submit: submit your predicted output along with hypothesis function
+
+IMPORTANT: when calling eval or submit, the 'fn' parameter MUST be a complete python function definition like:
+def blackbox(x: float) -> float:
+    return x + 2
+
+NOT just an expression like "x + 2" — that will fail to execute"""
 
         state["prompt"] = [{"role": "user", "content": game_prompt}]
 
