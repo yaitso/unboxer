@@ -60,14 +60,16 @@ image = (
 @app.function(
     gpu="H100:2",
     image=image,
-    secrets=[openrouter, fly_api, postgres],
     timeout=14400,
 )
 def train_unboxer():
     import os
     import subprocess
     import time
+    from dotenv import load_dotenv
     from trainer import train
+
+    load_dotenv()
 
     os.environ["NCCL_DEBUG"] = "WARN"
     os.environ["NCCL_SOCKET_IFNAME"] = "lo"
