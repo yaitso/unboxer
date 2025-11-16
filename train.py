@@ -68,9 +68,12 @@ image = (
     timeout=14400,
 )
 def train_unboxer():
+    import os
     import subprocess
     import time
     from trainer import train
+
+    os.environ["NCCL_DEBUG"] = "WARN"
 
     print("starting vLLM inference server...")
     vllm_process = subprocess.Popen(
