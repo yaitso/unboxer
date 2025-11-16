@@ -61,7 +61,7 @@ image = (
 
 
 @app.function(
-    gpu="H100:2",
+    gpu="H100:1",
     image=image,
     timeout=14400,
 )
@@ -80,9 +80,7 @@ def train_unboxer():
 
     os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
-    print("starting vLLM inference server on GPU 0...")
-    vllm_env = os.environ.copy()
-    vllm_env["CUDA_VISIBLE_DEVICES"] = "0"
+    print("starting vLLM inference server...")
     vllm_process = subprocess.Popen(
         [
             "vf-vllm",
@@ -91,12 +89,10 @@ def train_unboxer():
             "--tool-call-parser",
             "pythonic",
         ],
-        env=vllm_env,
     )
 
     time.sleep(10)
-    print("vLLM server should be starting up, beginning training on GPU 1...")
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    print("vLLM server should be starting up, beginning training...")
 
     postgres_val = os.environ.get("POSTGRES", "NOT_SET")
     print(

@@ -29,3 +29,4 @@ max_seq_len = 8192
 max_tokens = 2048
 learning_rate = 5e-5
 use_lora = true
+ddp_find_unused_parameters = false
