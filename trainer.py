@@ -2,6 +2,7 @@
 from pathlib import Path
 import tomllib
 import verifiers as vf
+from os import environ
 
 
 def train(config_path: str = "configs/unboxer.toml") -> dict:
@@ -16,6 +17,9 @@ def train(config_path: str = "configs/unboxer.toml") -> dict:
     model = config["model"]
     env_id = config["env"]["id"]
     env_args = config["env"].get("args", {})
+
+    if "dsn" not in env_args and "POSTGRES" in environ:
+        env_args["dsn"] = environ["POSTGRES"]
 
     env = vf.load_environment(env_id=env_id, **env_args)
     rl_config = vf.RLConfig(**config["trainer"].get("args", {}))
