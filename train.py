@@ -7,8 +7,8 @@ fly_api = modal.Secret.from_name("fly-api")
 postgres = modal.Secret.from_name("postgres")
 github = modal.Secret.from_name("github")
 
-volume = modal.Volume.from_name("unboxer-volume", create_if_missing=True)
-VOLUME_DIR = "/cache"
+volume = modal.Volume.from_name("unboxer-volume")
+VOLUME_DIR = "/mnt/data"
 REPO_DIR = f"{VOLUME_DIR}/unboxer"
 
 UV_SYNC_CMD = "uv sync --frozen --torch-backend cu128"
@@ -20,7 +20,7 @@ image = (
     .env({
         "HF_HUB_ENABLE_HF_TRANSFER": "1",
         "UV_HTTP_TIMEOUT": "600",
-        "UV_CACHE_DIR": "/cache/.uv-cache",
+        "UV_CACHE_DIR": "/mnt/data/.uv-cache",
         "PATH": "/usr/local/cuda-12.8/bin:$PATH",
         "LD_LIBRARY_PATH": "/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH",
     })

@@ -72,9 +72,28 @@ def sonnet():
 
 
 @cli.command()
+def setup():
+    """create modal volume for training (run once)"""
+    result = run(
+        ["modal", "volume", "list"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode == 0 and "unboxer-volume" in result.stdout:
+        click.echo("volume 'unboxer-volume' already exists")
+        return
+
+    run(["modal", "volume", "create", "unboxer-volume", "--version=2"], check=True)
+    click.echo("created volume 'unboxer-volume' (v2)")
+
+
+@cli.command()
 def train():
-    """train unboxer model (not implemented yet)"""
-    click.echo("training not implemented yet")
+    """train unboxer model on modal h100"""
+    script_dir = Path(__file__).parent
+    run(["uv", "run", "modal", "run", str(script_dir / "train.py")], check=True)
 
 
 def main():
