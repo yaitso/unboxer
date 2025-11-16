@@ -3,6 +3,7 @@ from pathlib import Path
 import tomllib
 import verifiers as vf
 from os import environ
+from huggingface_hub import HfApi, create_repo
 
 
 def train(config_path: str = "configs/unboxer.toml") -> dict:
@@ -32,6 +33,33 @@ def train(config_path: str = "configs/unboxer.toml") -> dict:
 
     trainer = vf.RLTrainer(model=model, env=env, args=rl_config)
     trainer.train()
+
+    if "HF_TOKEN" in environ:
+        hf_token = environ["HF_TOKEN"]
+        hf_username = environ.get("HF_USERNAME", "yaitso")
+        repo_name = "unboxer"
+        repo_id = f"{hf_username}/{repo_name}"
+
+        try:
+            create_repo(repo_id=repo_id, token=hf_token, exist_ok=True)
+        except Exception as e:
+            print(f"repo creation warning: {e}")
+
+        try:
+            if hasattr(trainer.model, "push_to_hub_merged"):
+                trainer.model.push_to_hub_merged(
+                    repo_id,
+                    trainer.tokenizer,
+                    token=hf_token,
+                    save_method="merged_16bit",
+                )
+                print(f"pushed model to {repo_id}")
+            else:
+                trainer.model.save_pretrained(rl_config.output_dir)
+                trainer.tokenizer.save_pretrained(rl_config.output_dir)
+                print(f"saved model to {rl_config.output_dir}")
+        except Exception as e:
+            print(f"model upload warning: {e}")
 
     return {"status": "complete"}
 
