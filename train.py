@@ -1,5 +1,4 @@
 import modal
-from pathlib import Path
 
 app = modal.App("unboxer")
 
@@ -8,33 +7,14 @@ fly_api = modal.Secret.from_name("fly-api")
 postgres = modal.Secret.from_name("postgres")
 
 volume = modal.Volume.from_name("unboxer-volume", create_if_missing=True)
-VOLUME_DIR = "/workspace"
+VOLUME_DIR = "/root/volume"
+REPO_DIR = f"{VOLUME_DIR}/unboxer"
 
 image = (
-    modal.Image.from_registry("ghcr.io/astral-sh/uv:python3.12-bookworm-slim")
-    .apt_install("git", "build-essential")
+    modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
+    .apt_install("git")
+    .run_commands("pip install uv")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600"})
-    .add_local_dir(
-        ".",
-        remote_path="/root/unboxer",
-        copy=True,
-        ignore=[
-            "__pycache__",
-            "*.pyc",
-            ".git",
-            ".venv",
-            ".hypothesis",
-            "*.log",
-            "CONTEXT.md",
-            "CONVO.md",
-            "TODO.md",
-            "old",
-            "un.egg-info",
-            "verifiers",
-        ],
-    )
-    .workdir("/root/unboxer")
-    .uv_sync()
 )
 
 
@@ -45,41 +25,57 @@ image = (
     secrets=[openrouter, fly_api, postgres],
     timeout=14400,
 )
-def train_unboxer(config_path: str = "configs/unboxer.toml"):
+def train_unboxer():
     import sys
     import os
+    import subprocess
+    from pathlib import Path
 
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib
+    os.environ["PATH"] = f"/usr/local/cuda-12.8/bin:{os.environ.get('PATH', '')}"
+    os.environ["LD_LIBRARY_PATH"] = f"/usr/local/cuda-12.8/lib64:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
-    import verifiers as vf
+    env_file = Path(f"{VOLUME_DIR}/.env")
+    if not env_file.exists():
+        raise FileNotFoundError(f"missing .env file at {env_file}")
 
-    os.chdir("/root/unboxer")
-    sys.path.insert(0, "/root/unboxer")
+    gh_token = None
+    for line in env_file.read_text().splitlines():
+        if line.startswith("GH_TOKEN="):
+            gh_token = line.split("=", 1)[1].strip()
+            break
 
-    config_file = Path(config_path)
-    if not config_file.exists():
-        raise FileNotFoundError(f"config not found: {config_path}")
+    if not gh_token:
+        raise ValueError("GH_TOKEN not found in .env")
 
-    with config_file.open("rb") as f:
-        config = tomllib.load(f)
+    repo_path = Path(REPO_DIR)
+    if not repo_path.exists():
+        print(f"cloning repo to {REPO_DIR}...")
+        subprocess.run([
+            "git", "clone",
+            f"https://{gh_token}@github.com/yaitso/rewarding.git",
+            REPO_DIR
+        ], check=True)
+        volume.commit()
+    else:
+        print(f"pulling latest changes in {REPO_DIR}...")
+        subprocess.run(["git", "-C", REPO_DIR, "pull"], env={**os.environ, "GH_TOKEN": gh_token}, check=True)
+        volume.commit()
 
-    model = config["model"]
-    env_id = config["env"]["id"]
-    env_args = config["env"].get("args", {})
+    os.chdir(REPO_DIR)
+    sys.path.insert(0, REPO_DIR)
 
-    env = vf.load_environment(env_id=env_id, **env_args)
-    rl_config = vf.RLConfig(**config["trainer"].get("args", {}))
-    trainer = vf.RLTrainer(model=model, env=env, args=rl_config)
-    trainer.train()
-
+    print("installing dependencies on H100...")
+    subprocess.run(["uv", "sync", "--frozen"], check=True)
+    print("committing venv to volume...")
     volume.commit()
-    return {"status": "complete"}
+
+    from trainer import train
+    result = train("configs/unboxer.toml")
+    volume.commit()
+    return result
 
 
 @app.local_entrypoint()
-def main(config: str = "configs/unboxer.toml"):
-    result = train_unboxer.remote(config_path=config)
+def main():
+    result = train_unboxer.remote()
     print(f"training complete: {result}")

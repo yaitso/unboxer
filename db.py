@@ -4,22 +4,27 @@ from typing import Optional
 
 
 class RolloutsDB:
-    def __init__(self):
+    def __init__(self, migrate: bool = False):
         self.dsn = environ.get("POSTGRES")
         if not self.dsn:
             raise ValueError("POSTGRES connection string not found in environment")
         self.pool: Optional[asyncpg.Pool] = None
+        self.migrate = migrate
 
     async def connect(self):
         self.pool = await asyncpg.create_pool(self.dsn)
-        await self._init_schema()
+        await self.init_schema()
         return self
 
-    async def _init_schema(self):
+    async def init_schema(self):
         async with self.pool.acquire() as conn:
             await conn.execute("""
                 CREATE SCHEMA IF NOT EXISTS unboxer
             """)
+
+            if self.migrate:
+                await conn.execute("DROP TABLE IF EXISTS unboxer.rollouts")
+
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS unboxer.rollouts (
                     id SERIAL PRIMARY KEY,
@@ -63,9 +68,7 @@ class RolloutsDB:
                 rollout_id,
             )
 
-    async def get_adversarial_llm_context(
-        self, window_size: int = 100
-    ) -> list[dict]:
+    async def get_rollout_window(self, window_size: int = 100) -> list[dict]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """

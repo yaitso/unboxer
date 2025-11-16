@@ -15,3 +15,4 @@ unboxer_ssh
 unboxer_ssh.pub
 .hypothesis/
 **/*.log
+proxy/target/

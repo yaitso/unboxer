@@ -91,11 +91,11 @@ class Sandbox:
             machine_data = machine_resp.json()
             self.machine_id = machine_data["id"]
 
-            await self._wait_for_machine()
+            await self.wait_for_machine()
 
             return self.machine_id
 
-    async def _wait_for_machine(self, timeout: int = 120):
+    async def wait_for_machine(self, timeout: int = 120):
         start = asyncio.get_event_loop().time()
         async with httpx.AsyncClient() as client:
             while True:

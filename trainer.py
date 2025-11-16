@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 from pathlib import Path
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
-
+import tomllib
 import verifiers as vf
 
 
-def main():
-    config_path = Path("configs/unboxer.toml")
-    if not config_path.exists():
-        raise SystemExit(f"config not found: {config_path}")
+def train(config_path: str = "configs/unboxer.toml") -> dict:
+    """train model with given config"""
+    config_file = Path(config_path)
+    if not config_file.exists():
+        raise FileNotFoundError(f"config not found: {config_path}")
 
-    with config_path.open("rb") as f:
+    with config_file.open("rb") as f:
         config = tomllib.load(f)
 
     model = config["model"]
@@ -26,6 +22,9 @@ def main():
     trainer = vf.RLTrainer(model=model, env=env, args=rl_config)
     trainer.train()
 
+    return {"status": "complete"}
+
 
 if __name__ == "__main__":
-    main()
+    result = train()
+    print(f"training complete: {result}")

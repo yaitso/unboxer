@@ -7,6 +7,7 @@ id = "unboxer"
 max_turns = 20
 use_remote = false
 train_step = 0
+migrate = true
 
 [inference]
 gpus = 1

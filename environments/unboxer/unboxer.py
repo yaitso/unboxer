@@ -6,7 +6,28 @@ from verifiers.types import Messages, State
 from sandbox import Sandbox
 from db import RolloutsDB
 import hypothesis.strategies as st
-from datasets import Dataset
+import prompts
+
+
+def sample_holes(holes_spec: dict) -> dict:
+    """sample values for holes from hypothesis strategies"""
+    sampled = {}
+    for hole, strategy in holes_spec.items():
+        sampled[hole] = round(strategy.example(), 1)
+    return sampled
+
+
+def instantiate_function(template: str, holes: dict) -> str:
+    """replace $hole$ placeholders with sampled values"""
+    fn = template
+    for hole, value in holes.items():
+        fn = fn.replace(f"${hole}$", str(value))
+    return fn
+
+
+def sample_kwargs(kwargs_spec: dict) -> dict:
+    """sample kwargs from hypothesis strategies"""
+    return {k: round(v.example(), 1) for k, v in kwargs_spec.items()}
 
 
 class UnboxerEnv(vf.MultiTurnEnv):
@@ -17,94 +38,87 @@ class UnboxerEnv(vf.MultiTurnEnv):
         rollouts_per_step: int = 1,
         use_remote: bool = True,
         train_run: Optional[int] = None,
+        target_solve_rate: float = 0.4,
+        migrate: bool = False,
         **kwargs,
     ):
-        if "dataset" not in kwargs:
-            kwargs["dataset"] = Dataset.from_dict(
-                {"example_id": [0], "question": ["dummy"]}
-            )
         super().__init__(max_turns=max_turns, **kwargs)
         self.max_turns = max_turns
         self.train_step = train_step
         self.rollouts_per_step = rollouts_per_step
         self.use_remote = use_remote
         self.train_run = train_run
-        self.db = None
-        self._db_initialized = False
+        self.target_solve_rate = target_solve_rate
+        self.migrate = migrate
+        self.db: RolloutsDB = None  # type: ignore
+        self.db_initialized = False
+        self.current_complexity = {"num_ops": 1, "num_holes": 0, "num_args": 1}
 
-    async def _ensure_db(self):
-        if not self._db_initialized:
-            self.db = RolloutsDB()
+    async def ensure_db(self):
+        if not self.db_initialized:
+            self.db = RolloutsDB(migrate=self.migrate)
             await self.db.connect()
-            self._db_initialized = True
+            if self.train_run is None:
+                self.train_run = await self.db.get_next_train_run()
+            self.db_initialized = True
 
-    async def _generate_blackbox_fn(
+    async def get_or_create_client(
         self, client: Optional[AsyncOpenAI] = None
+    ) -> AsyncOpenAI:
+        """get existing client or create new one"""
+        if client is not None:
+            return client
+
+        from openai import AsyncOpenAI
+        from os import environ
+
+        return AsyncOpenAI(
+            api_key=environ.get("OPENAI_API_KEY"),
+            base_url="https://openrouter.ai/api/v1",
+        )
+
+    async def adjust_complexity(self, client: Optional[AsyncOpenAI] = None) -> dict:
+        """first haiku call: determine new complexity based on db stats"""
+        await self.ensure_db()
+        client = await self.get_or_create_client(client)
+
+        rollout_window = await self.db.get_rollout_window(window_size=100)
+        overall_mean = (
+            sum(r["mean_reward"] for r in rollout_window) / len(rollout_window)
+            if rollout_window
+            else 0.0
+        )
+
+        prompt = prompts.complexity_adjustment_prompt(
+            self.current_complexity,
+            rollout_window,
+            overall_mean,
+            self.target_solve_rate,
+        )
+
+        response = await client.chat.completions.create(
+            model="anthropic/claude-haiku-4.5",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+
+        content = response.choices[0].message.content
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            data = json.loads(content[content.find("{") : content.rfind("}") + 1])
+
+        return data
+
+    async def generate_blackbox_fn(
+        self, complexity: dict, client: Optional[AsyncOpenAI] = None
     ) -> tuple[str, dict, dict, list, dict]:
-        await self._ensure_db()
+        """second haiku call: generate function with given complexity"""
+        await self.ensure_db()
+        client = await self.get_or_create_client(client)
 
-        if self.train_step == 0:
-            complexity = {"num_ops": 1, "num_holes": 0, "num_args": 1}
-            context_section = f"""this is the first train_step, so complexity settings are:
-num_ops: {complexity["num_ops"]}
-num_holes: {complexity["num_holes"]}
-num_args: {complexity["num_args"]}
-
-examples of valid functions:
-- def blackbox(x): return sin(x)
-- def blackbox(y): return y**y  # zero holes via arg reuse
-
-NOT allowed:
-- def blackbox(z): return z**2  # 2 is a hole of type <int>"""
-        else:
-            context = await self.db.get_adversarial_llm_context(window_size=100)
-            overall_mean = (
-                sum(r["mean_reward"] for r in context) / len(context)
-                if context
-                else 0.0
-            )
-            context_section = f"""recent unique functions and their mean rewards:
-{json.dumps(context[:10], indent=2)}
-
-overall mean reward: {overall_mean:.2f}
-target solve rate: 0.4
-
-adjust complexity (num_ops, num_holes, num_args) based on mean reward."""
-
-        prompt = f"""generate a novel python function for a reverse engineering game.
-
-COMPLEXITY KNOBS:
-1. num_ops: count of operators + math functions (e.g., +, **, sin, cos)
-   - only bool, int, float builtins and `from math import *` allowed
-   - count_of_ops + count_of_functions = num_ops
-
-2. num_holes: typed placeholders in the function
-   - instead of `def blackbox(a): return a + 2`
-   - use `def blackbox(a): return a + $c$`
-   - holes let you generate function shapes, we sample values
-   - mark holes with $name$ syntax
-
-3. num_args: number of function arguments (self-explanatory)
-
-{context_section}
-
-respond with json using hypothesis strategies:
-{{
-    "fn": "def blackbox(a: float) -> float:\\n    return sin(a + $b$)",
-    "kwargs": {{"a": "st.floats(-10, 10)"}},
-    "holes": {{"b": "st.floats(0, 5)"}}
-}}
-
-note: all values will be rounded to 1 decimal place."""
-
-        if client is None:
-            from openai import AsyncOpenAI
-            from os import environ
-
-            client = AsyncOpenAI(
-                api_key=environ.get("OPENAI_API_KEY"),
-                base_url="https://openrouter.ai/api/v1",
-            )
+        rollout_window = await self.db.get_rollout_window(window_size=100)
+        prompt = prompts.new_function_prompt(complexity, rollout_window)
 
         response = await client.chat.completions.create(
             model="anthropic/claude-haiku-4.5",
@@ -122,44 +136,29 @@ note: all values will be rounded to 1 decimal place."""
         kwargs_spec_str = data["kwargs"]
         holes_spec_str = data.get("holes", {})
 
-        kwargs_spec = {}
-        for param, strategy_str in kwargs_spec_str.items():
-            kwargs_spec[param] = eval(strategy_str, {"st": st})
+        kwargs_spec = {
+            param: eval(strategy_str, {"st": st})
+            for param, strategy_str in kwargs_spec_str.items()
+        }
+        holes_spec = {
+            hole: eval(strategy_str, {"st": st})
+            for hole, strategy_str in holes_spec_str.items()
+        }
 
-        holes_spec = {}
-        for hole, strategy_str in holes_spec_str.items():
-            holes_spec[hole] = eval(strategy_str, {"st": st})
+        sampled_holes = sample_holes(holes_spec)
+        blackbox_fn = instantiate_function(blackbox_fn_template, sampled_holes)
 
-        def sample_and_instantiate():
-            sampled_holes = {}
-            for hole, strategy in holes_spec.items():
-                sampled_holes[hole] = round(strategy.example(), 1)
-
-            instantiated_fn = blackbox_fn_template
-            for hole, value in sampled_holes.items():
-                instantiated_fn = instantiated_fn.replace(f"${hole}$", str(value))
-
-            return instantiated_fn, sampled_holes
-
-        blackbox_fn, sampled_holes = sample_and_instantiate()
-
-        io_pairs = []
-        for i in range(3):
-            kwargs = {}
-            for param, strategy in kwargs_spec.items():
-                kwargs[param] = round(strategy.example(), 1)
-
+        n_input_output_pairs = []
+        for _ in range(3):
+            kwargs = sample_kwargs(kwargs_spec)
             result = Sandbox.local(blackbox_fn, kwargs)
             if result.is_ok():
                 output = round(result.ok()["output"], 1)
-                io_pairs.append({"input": kwargs, "output": output})
+                n_input_output_pairs.append({"input": kwargs, "output": output})
 
-        next_input = {}
-        for param, strategy in kwargs_spec.items():
-            next_input[param] = round(strategy.example(), 1)
-
-        expected_result = Sandbox.local(blackbox_fn, next_input)
-        expected_output = (
+        n_plus_one_input = sample_kwargs(kwargs_spec)
+        expected_result = Sandbox.local(blackbox_fn, n_plus_one_input)
+        n_plus_one_output = (
             round(expected_result.ok()["output"], 1)
             if expected_result.is_ok()
             else None
@@ -169,20 +168,28 @@ note: all values will be rounded to 1 decimal place."""
             blackbox_fn,
             kwargs_spec,
             holes_spec,
-            io_pairs,
-            {"next_input": next_input, "expected_output": expected_output},
+            n_input_output_pairs,
+            {"n_plus_one_input": n_plus_one_input, "n_plus_one_output": n_plus_one_output},
         )
 
     async def setup_state(self, state: State, **kwargs) -> State:
         client = kwargs.get("client")
 
+        await self.ensure_db()
+
+        if self.train_step == 0:
+            complexity = {"num_ops": 1, "num_holes": 0, "num_args": 1}
+        else:
+            complexity = await self.adjust_complexity(client)
+            self.current_complexity = complexity
+
         (
             blackbox_fn,
             kwargs_spec,
             holes_spec,
-            io_pairs,
+            n_input_output_pairs,
             next_data,
-        ) = await self._generate_blackbox_fn(client)
+        ) = await self.generate_blackbox_fn(complexity, client)
 
         if self.use_remote:
             sandbox = Sandbox()
@@ -194,12 +201,14 @@ note: all values will be rounded to 1 decimal place."""
             state["machine_id"] = "local"
 
         state["budget"] = self.max_turns
-        state["io_pairs"] = io_pairs
-        state["next_input"] = next_data["next_input"]
+        state["complexity"] = complexity
+        state["holes_spec"] = holes_spec
+        state["n_input_output_pairs"] = n_input_output_pairs
+        state["n_plus_one_input"] = next_data["n_plus_one_input"]
         state["blackbox_fn"] = blackbox_fn
-        state["expected_output"] = next_data["expected_output"]
+        state["n_plus_one_output"] = next_data["n_plus_one_output"]
+        state["kwargs_spec"] = kwargs_spec
 
-        await self._ensure_db()
         rollout_id = await self.db.add_rollout(
             train_step=self.train_step,
             rollout_name=state["machine_id"],
@@ -287,7 +296,7 @@ note: all values will be rounded to 1 decimal place."""
                 args = json.loads(tool_call["function"]["arguments"])
                 predicted_output = args["output"]
 
-                expected = state["expected_output"]
+                expected = state["n_plus_one_output"]
                 tolerance = 0.5
 
                 if abs(predicted_output - expected) <= tolerance:
@@ -303,17 +312,21 @@ note: all values will be rounded to 1 decimal place."""
                         }
                     )
                 else:
-                    state["next_input"] = state["info"].get(
-                        "next_next_input", state["next_input"]
+                    n_plus_one_input = sample_kwargs(state["kwargs_spec"])
+                    expected_result = Sandbox.local(state["blackbox_fn"], n_plus_one_input)
+                    n_plus_one_output = (
+                        round(expected_result.ok()["output"], 1)
+                        if expected_result.is_ok()
+                        else None
                     )
-                    state["expected_output"] = state["info"].get(
-                        "next_expected_output", state["expected_output"]
-                    )
+
+                    state["n_plus_one_input"] = n_plus_one_input
+                    state["n_plus_one_output"] = n_plus_one_output
 
                     tool_responses.append(
                         {
                             "role": "tool",
-                            "content": f"✗ incorrect. expected: {expected}, got: {predicted_output} (tolerance: ±{tolerance}). try predicting output for: {state['next_input']}",
+                            "content": f"✗ incorrect. expected: {expected}, got: {predicted_output} (tolerance: ±{tolerance}). try predicting output for: {state['n_plus_one_input']}",
                             "tool_call_id": tool_call["id"],
                         }
                     )
@@ -328,68 +341,18 @@ note: all values will be rounded to 1 decimal place."""
         return tool_responses, state
 
 
-def load_environment(debug: bool = False, **kwargs) -> vf.Environment:
-    oai_tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "bash",
-                "description": "execute bash command in persistent sandbox vm",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "bash command to execute",
-                        },
-                    },
-                    "required": ["command"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "eval",
-                "description": "execute python function with given kwargs in isolated environment",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "fn": {
-                            "type": "string",
-                            "description": "python function definition to execute",
-                        },
-                        "kwargs": {
-                            "type": "string",
-                            "description": "JSON array of kwarg dicts to test function with",
-                        },
-                    },
-                    "required": ["fn", "kwargs"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "submit",
-                "description": "submit your predicted output",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "fn": {
-                            "type": "string",
-                            "description": "your hypothesis function definition",
-                        },
-                        "output": {
-                            "type": "number",
-                            "description": "predicted output for the given input",
-                        },
-                    },
-                    "required": ["fn", "output"],
-                },
-            },
-        },
-    ]
+def load_environment(
+    debug: bool = False, num_examples: int = 100, **kwargs
+) -> vf.Environment:
+    if "dataset" not in kwargs:
+        from datasets import Dataset
+
+        kwargs["dataset"] = Dataset.from_dict(
+            {
+                "example_id": list(range(num_examples)),
+                "question": ["dummy"] * num_examples,
+            }
+        )
 
     rubric = vf.Rubric()
 
@@ -400,4 +363,4 @@ def load_environment(debug: bool = False, **kwargs) -> vf.Environment:
 
     rubric.add_reward_func(reward_func)
 
-    return UnboxerEnv(rubric=rubric, oai_tools=oai_tools, **kwargs)
+    return UnboxerEnv(rubric=rubric, oai_tools=prompts.oai_tools(), **kwargs)
