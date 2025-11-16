@@ -80,7 +80,13 @@ def train_unboxer():
     vllm_env = os.environ.copy()
     vllm_env["CUDA_VISIBLE_DEVICES"] = "0"
     vllm_process = subprocess.Popen(
-        ["vf-vllm", "Qwen/Qwen3-0.6B"],
+        [
+            "vf-vllm",
+            "Qwen/Qwen3-0.6B",
+            "--enable-auto-tool-choice",
+            "--tool-call-parser",
+            "pythonic",
+        ],
         env=vllm_env,
     )
 
