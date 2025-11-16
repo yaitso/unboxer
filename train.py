@@ -62,7 +62,7 @@ image = (
 
 
 @app.function(
-    gpu="H100",
+    gpu="H100:2",
     image=image,
     secrets=[openrouter, fly_api, postgres],
     timeout=14400,
