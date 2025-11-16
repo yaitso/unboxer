@@ -2,10 +2,6 @@ import modal
 
 app = modal.App("unboxer")
 
-openrouter = modal.Secret.from_name("openrouter")
-fly_api = modal.Secret.from_name("fly-api")
-postgres = modal.Secret.from_name("postgres")
-
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
     .apt_install("git", "wget")
