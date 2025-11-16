@@ -34,6 +34,7 @@ def train_unboxer():
 
     os.environ["PATH"] = f"/usr/local/cuda-12.8/bin:{os.environ.get('PATH', '')}"
     os.environ["LD_LIBRARY_PATH"] = f"/usr/local/cuda-12.8/lib64:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    os.environ["UV_CACHE_DIR"] = f"{VOLUME_DIR}/.uv-cache"
 
     gh_token = os.environ.get("GH_TOKEN")
     if not gh_token:
@@ -63,7 +64,7 @@ def train_unboxer():
     subprocess.run(["uv", "pip", "install", "--no-deps", flash_wheel], check=True)
 
     print("installing dependencies on H100...")
-    subprocess.run(["uv", "sync", "--frozen"], check=True)
+    subprocess.run(["uv", "sync", "--frozen", "--torch-backend", "cu128"], check=True)
     print("committing venv to volume...")
     volume.commit()
 
