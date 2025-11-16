@@ -18,13 +18,12 @@ class RolloutsDB:
 
     async def init_schema(self):
         async with self.pool.acquire() as conn:
+            if self.migrate:
+                await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
+
             await conn.execute("""
                 CREATE SCHEMA IF NOT EXISTS unboxer
             """)
-
-            if self.migrate:
-                await conn.execute("DROP TABLE IF EXISTS unboxer.rollouts CASCADE")
-                await conn.execute("DROP SEQUENCE IF EXISTS unboxer.rollouts_id_seq CASCADE")
 
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS unboxer.rollouts (
