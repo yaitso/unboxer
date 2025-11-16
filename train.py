@@ -88,8 +88,8 @@ def train_unboxer():
     print("vLLM server should be starting up, beginning training on GPU 1...")
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    if "POSTGRES" not in os.environ:
-        print("WARNING: POSTGRES env var not set, modal secret might not be configured correctly")
+    postgres_val = os.environ.get("POSTGRES", "NOT_SET")
+    print(f"POSTGRES env var: {postgres_val[:50]}..." if len(postgres_val) > 50 else f"POSTGRES env var: {postgres_val}")
 
     try:
         result = train("configs/unboxer.toml")
