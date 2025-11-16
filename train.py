@@ -11,16 +11,23 @@ volume = modal.Volume.from_name("unboxer-volume", create_if_missing=True)
 VOLUME_DIR = "/root/volume"
 REPO_DIR = f"{VOLUME_DIR}/unboxer"
 
+UV_SYNC_CMD = "uv sync --frozen --torch-backend cu128"
+
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
     .apt_install("git", "wget")
+    .run_commands("pip install uv")
+    .env({
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        "UV_HTTP_TIMEOUT": "600",
+        "UV_CACHE_DIR": f"{VOLUME_DIR}/.uv-cache",
+        "PATH": "/usr/local/cuda-12.8/bin:$PATH",
+        "LD_LIBRARY_PATH": "/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH",
+    })
     .run_commands(
-        "pip install uv",
-        "uv venv /opt/venv",
         "wget -q https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
-        "/opt/venv/bin/pip install --no-dependencies flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
+        "pip install --no-dependencies flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
     )
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600", "PATH": "/opt/venv/bin:$PATH"})
 )
 
 
@@ -36,10 +43,6 @@ def train_unboxer():
     import os
     import subprocess
     from pathlib import Path
-
-    os.environ["PATH"] = f"/usr/local/cuda-12.8/bin:{os.environ.get('PATH', '')}"
-    os.environ["LD_LIBRARY_PATH"] = f"/usr/local/cuda-12.8/lib64:{os.environ.get('LD_LIBRARY_PATH', '')}"
-    os.environ["UV_CACHE_DIR"] = f"{VOLUME_DIR}/.uv-cache"
 
     gh_token = os.environ.get("GH_TOKEN")
     if not gh_token:
@@ -62,8 +65,8 @@ def train_unboxer():
     os.chdir(REPO_DIR)
     sys.path.insert(0, REPO_DIR)
 
-    print("installing dependencies...")
-    subprocess.run(["uv", "sync", "--frozen", "--torch-backend", "cu128"], check=True)
+    print(f"installing dependencies: {UV_SYNC_CMD}")
+    subprocess.run(UV_SYNC_CMD.split(), check=True)
 
     from trainer import train
     result = train("configs/unboxer.toml")
