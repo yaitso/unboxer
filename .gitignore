@@ -16,3 +16,6 @@ unboxer_ssh.pub
 .hypothesis/
 **/*.log
 proxy/target/
+secret.nu
+CONVO.md
+CONTEXT.md
