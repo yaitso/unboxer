@@ -20,6 +20,7 @@ dependencies = [
     "flash-attn>=2.8.3",
     "modal>=1.2.2",
     "huggingface-hub>=0.30.0",
+    "hf-transfer>=0.1.0",
 ]
 
 [project.scripts]

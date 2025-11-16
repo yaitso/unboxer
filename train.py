@@ -76,6 +76,7 @@ def train_unboxer():
 
     os.environ["NCCL_DEBUG"] = "WARN"
     os.environ["NCCL_SOCKET_IFNAME"] = "lo"
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
     print("starting vLLM inference server on GPU 0...")
     vllm_env = os.environ.copy()
