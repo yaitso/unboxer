@@ -120,16 +120,13 @@ class Sandbox:
         if not self.machine_id:
             raise ValueError("machine not created yet")
 
-        proc = await asyncio.create_subprocess_exec(
-            "flyctl",
-            "ssh",
-            "console",
-            "-a",
-            self.app_name,
-            "-C",
-            command,
-            "--machine",
-            self.machine_id,
+        import shlex
+        
+        shell_cmd = f"sh -c {shlex.quote(command)}"
+        full_command = f"flyctl machine exec -a {self.app_name} {self.machine_id} {shlex.quote(shell_cmd)}"
+
+        proc = await asyncio.create_subprocess_shell(
+            full_command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

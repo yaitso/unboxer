@@ -13,27 +13,21 @@ async def test_remote_sandbox_persistence():
 
     try:
         machine_id = await sandbox.create()
-        print(f"created sandbox {machine_id}")
 
         test_content = f"persistence_test_{sandbox.machine_name}"
-        write_result = await sandbox.bash(
-            f"echo '{test_content}' > /workspace/test.txt"
-        )
-        print(f"wrote file: {write_result}")
+        await sandbox.bash(f"echo '{test_content}' > /workspace/test.txt")
 
         read_result = await sandbox.bash("cat /workspace/test.txt")
-        print(f"read file: {read_result}")
 
-        assert (
-            test_content in read_result
-        ), f"expected '{test_content}' in output, got: {read_result}"
+        assert test_content in read_result, (
+            f"expected '{test_content}' in output, got: {read_result}"
+        )
 
         ls_result = await sandbox.bash("ls -la /workspace")
-        print(f"workspace contents:\n{ls_result}")
+        assert "test.txt" in ls_result
 
     finally:
         await sandbox.destroy()
-        print("destroyed sandbox")
 
 
 @pytest.mark.asyncio

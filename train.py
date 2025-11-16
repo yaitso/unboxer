@@ -1,4 +1,5 @@
 import modal
+from pathlib import Path
 
 app = modal.App("unboxer")
 
@@ -10,27 +11,30 @@ volume = modal.Volume.from_name("unboxer-volume", create_if_missing=True)
 VOLUME_DIR = "/workspace"
 
 image = (
-    modal.Image.debian_slim(python_version="3.12")
-    .apt_install("git", "curl", "ca-certificates", "build-essential")
+    modal.Image.from_registry("ghcr.io/astral-sh/uv:python3.12-bookworm-slim")
+    .apt_install("git", "build-essential")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600"})
-    .uv_pip_install("huggingface_hub[hf_transfer]")
-    .uv_pip_install("torch>=2.8.0", "triton>=3.4.0")
-    .uv_pip_install(
-        "transformers>=4.51.0",
-        "vllm>=0.6.8",
-        "click",
-        "pytest",
-        "pytest-asyncio",
-        "result",
-        "xxhash",
-        "python-dotenv",
-        "httpx>=0.28.1",
-        "asyncpg>=0.30.0",
-        "hypothesis>=6.148.0",
-        "openai",
-        "datasets",
-        "verifiers[rl]",
+    .add_local_dir(
+        ".",
+        remote_path="/root/unboxer",
+        copy=True,
+        ignore=[
+            "__pycache__",
+            "*.pyc",
+            ".git",
+            ".venv",
+            ".hypothesis",
+            "*.log",
+            "CONTEXT.md",
+            "CONVO.md",
+            "TODO.md",
+            "old",
+            "un.egg-info",
+            "verifiers",
+        ],
     )
+    .workdir("/root/unboxer")
+    .uv_sync()
 )
 
 
@@ -44,8 +48,6 @@ image = (
 def train_unboxer(config_path: str = "configs/unboxer.toml"):
     import sys
     import os
-    from pathlib import Path
-    import shutil
 
     try:
         import tomllib
@@ -53,25 +55,6 @@ def train_unboxer(config_path: str = "configs/unboxer.toml"):
         import tomli as tomllib
 
     import verifiers as vf
-
-    os.makedirs("/root/unboxer", exist_ok=True)
-
-    for item in [
-        "environments",
-        "sandbox.py",
-        "db.py",
-        "unboxer.py",
-        "configs",
-        "trainer.py",
-    ]:
-        src = Path(__file__).parent / item
-        dst = Path("/root/unboxer") / item
-        if src.is_file():
-            shutil.copy2(src, dst)
-        elif src.is_dir():
-            if dst.exists():
-                shutil.rmtree(dst)
-            shutil.copytree(src, dst)
 
     os.chdir("/root/unboxer")
     sys.path.insert(0, "/root/unboxer")
