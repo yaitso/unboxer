@@ -7,3 +7,11 @@
 **/.ruff_cache
 **/un.egg-info
 verifiers/
+**/terraform.tfvars
+*.tfplan
+*.tfstate
+*.tfstate.backupunboxer_ssh
+unboxer_ssh
+unboxer_ssh.pub
+.hypothesis/
+**/*.log

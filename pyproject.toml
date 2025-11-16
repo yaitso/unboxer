@@ -4,7 +4,19 @@ version = "0.1.0"
 description = "blackbox function reverse engineering RL environment"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["click", "pytest", "result", "xxhash", "verifiers[rl]", "python-dotenv"]
+dependencies = [
+    "click",
+    "pytest",
+    "pytest-asyncio",
+    "result",
+    "xxhash",
+    "verifiers[rl]",
+    "python-dotenv",
+    "pyturso>=0.3.2",
+    "httpx>=0.28.1",
+    "asyncpg>=0.30.0",
+    "hypothesis>=6.148.0",
+]
 
 [project.scripts]
 un = "un:main"
@@ -17,7 +29,8 @@ override-dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["un", "sandbox"]
+packages = ["environments.unboxer"]
+py-modules = ["un", "sandbox", "db", "unboxer"]
 
 [tool.pytest.ini_options]
 python_files = ["*.test.py", "test_*.py"]

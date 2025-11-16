@@ -28,6 +28,15 @@ this environment is infinitely scalable. meaning you can always generate bigger,
 
 there's a shitload of literature on program synthesis. but for some reason my cursory glance through it didn't reveal anyone scaling this up as i did as objective of RL training of modern LLMs. plz hire me my family is starving.
 
+
+# future work
+
+- functions with hidden state ~ POMDPs
+- autoregressive functions ~ bit easier than POMDPs cuz you can at least see that hidden state
+- more tools:
+  - VLMs will probably be more sample-efficient via eyeballing of .png files of function plots
+- perf & stability
+
 # BONUS: how to fathom "300 IQ AGI"
 
 people throw around 300 IQ like it's incomprehensible. but it's just arithmetic:
