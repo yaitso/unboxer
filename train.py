@@ -38,6 +38,7 @@ image = (
         "uv venv --python 3.12",
         "uv sync --frozen",
     )
+    .env({"PATH": "/root/unboxer/.venv/bin:$PATH"})
     .add_local_dir(
         ".",
         remote_path="/root/unboxer",

@@ -93,7 +93,19 @@ def setup():
 def train():
     """train unboxer model on modal h100"""
     script_dir = Path(__file__).parent
-    run(["uv", "run", "modal", "run", str(script_dir / "train.py")], check=True)
+    run(
+        [
+            "uv",
+            "run",
+            "modal",
+            "run",
+            str(
+                script_dir / "train.py",
+            ),
+        ],
+        cwd=script_dir,
+        check=True,
+    )
 
 
 def main():
