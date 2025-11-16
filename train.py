@@ -5,6 +5,10 @@ app = modal.App("unboxer")
 openrouter = modal.Secret.from_name("openrouter")
 fly_api = modal.Secret.from_name("fly-api")
 postgres = modal.Secret.from_name("postgres")
+flash_attn_whl = (
+    "flash_attn-2.8.3+cu12torch2.8cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
+)
+flash_attn = f"https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.2/{flash_attn_whl}"
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
@@ -17,6 +21,26 @@ image = (
             "PATH": "/usr/local/cuda-12.8/bin:$PATH",
             "LD_LIBRARY_PATH": "/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH",
         }
+    )
+    .add_local_file(
+        "pyproject.toml",
+        remote_path="/root/unboxer/pyproject.toml",
+        copy=True,
+    )
+    .add_local_file(
+        "uv.lock",
+        remote_path="/root/unboxer/uv.lock",
+        copy=True,
+    )
+    .workdir("/root/unboxer")
+    .add_local_dir(
+        "environments",
+        remote_path="/root/unboxer/environments",
+        copy=True,
+    )
+    .run_commands(
+        "uv venv --python 3.12",
+        "uv sync --frozen",
     )
     .add_local_dir(
         ".",
@@ -37,15 +61,6 @@ image = (
             "verifiers",
             "proxy/target",
         ],
-    )
-    .workdir("/root/unboxer")
-    .run_commands(
-        "uv venv",
-        "uv pip install pip",
-        "uv pip install --index-url https://download.pytorch.org/whl/cu128 torch",
-        "wget -q https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
-        "uv pip install --no-deps ./flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
-        "uv sync --frozen --no-install-package flash-attn --no-install-package torch",
     )
 )
 

@@ -10,12 +10,15 @@ dependencies = [
     "pytest-asyncio",
     "result",
     "xxhash",
-    "verifiers[rl]",
+    "verifiers[rl]>=0.1.7.post0",
     "python-dotenv",
     "pyturso>=0.3.2",
     "httpx>=0.28.1",
     "asyncpg>=0.30.0",
     "hypothesis>=6.148.0",
+    "torch>=2.8.0",
+    "flash-attn>=2.8.3",
+    "modal>=1.2.2",
 ]
 
 [project.scripts]
@@ -27,6 +30,12 @@ override-dependencies = [
     "triton; platform_system == 'Linux'",
     "flash-attn; platform_system == 'Linux'",
 ]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [{requirement = "torch", match-runtime = true}]
+
+[tool.uv.extra-build-variables]
+flash-attn = {FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE"}
 
 [tool.setuptools]
 packages = ["environments.unboxer"]
