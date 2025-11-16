@@ -5,10 +5,6 @@ app = modal.App("unboxer")
 openrouter = modal.Secret.from_name("openrouter")
 fly_api = modal.Secret.from_name("fly-api")
 postgres = modal.Secret.from_name("postgres")
-flash_attn_whl = (
-    "flash_attn-2.8.3+cu12torch2.8cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
-)
-flash_attn = f"https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.2/{flash_attn_whl}"
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
