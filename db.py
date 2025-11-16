@@ -24,6 +24,7 @@ class RolloutsDB:
 
             if self.migrate:
                 await conn.execute("DROP TABLE IF EXISTS unboxer.rollouts CASCADE")
+                await conn.execute("DROP SEQUENCE IF EXISTS unboxer.rollouts_id_seq CASCADE")
 
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS unboxer.rollouts (
