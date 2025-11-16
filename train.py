@@ -68,10 +68,27 @@ image = (
     timeout=14400,
 )
 def train_unboxer():
+    import subprocess
+    import time
     from trainer import train
 
-    result = train("configs/unboxer.toml")
-    return result
+    print("starting vLLM inference server...")
+    vllm_process = subprocess.Popen(
+        ["vf-vllm", "--model", "Qwen/Qwen3-0.6B"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    time.sleep(10)
+    print("vLLM server should be starting up, beginning training...")
+
+    try:
+        result = train("configs/unboxer.toml")
+        return result
+    finally:
+        print("terminating vLLM server...")
+        vllm_process.terminate()
+        vllm_process.wait(timeout=30)
 
 
 @app.local_entrypoint()
