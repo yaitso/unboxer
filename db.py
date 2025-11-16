@@ -4,8 +4,8 @@ from typing import Optional
 
 
 class RolloutsDB:
-    def __init__(self, migrate: bool = False):
-        self.dsn = environ.get("POSTGRES")
+    def __init__(self, migrate: bool = False, dsn: Optional[str] = None):
+        self.dsn = dsn or environ.get("POSTGRES")
         if not self.dsn:
             raise ValueError("POSTGRES connection string not found in environment")
         self.pool: Optional[asyncpg.Pool] = None

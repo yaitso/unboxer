@@ -56,7 +56,7 @@ class UnboxerEnv(vf.MultiTurnEnv):
 
     async def ensure_db(self):
         if not self.db_initialized:
-            self.db = RolloutsDB(migrate=self.migrate)
+            self.db = RolloutsDB(migrate=self.migrate, dsn=self.dsn)
             await self.db.connect()
             if self.train_run is None:
                 self.train_run = await self.db.get_next_train_run()
