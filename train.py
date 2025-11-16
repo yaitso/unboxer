@@ -76,14 +76,17 @@ def train_unboxer():
     os.environ["NCCL_DEBUG"] = "WARN"
     os.environ["NCCL_SOCKET_IFNAME"] = "lo"
 
-    print("starting vLLM inference server...")
+    print("starting vLLM inference server on GPU 0...")
+    vllm_env = os.environ.copy()
+    vllm_env["CUDA_VISIBLE_DEVICES"] = "0"
     vllm_process = subprocess.Popen(
         ["vf-vllm", "Qwen/Qwen3-0.6B"],
-        env=os.environ.copy(),
+        env=vllm_env,
     )
 
     time.sleep(10)
-    print("vLLM server should be starting up, beginning training...")
+    print("vLLM server should be starting up, beginning training on GPU 1...")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     try:
         result = train("configs/unboxer.toml")
