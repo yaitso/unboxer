@@ -23,13 +23,14 @@ class RolloutsDB:
             """)
 
             if self.migrate:
-                await conn.execute("DROP TABLE IF EXISTS unboxer.rollouts")
+                await conn.execute("DROP TABLE IF EXISTS unboxer.rollouts CASCADE")
 
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS unboxer.rollouts (
                     id SERIAL PRIMARY KEY,
                     train_run INTEGER DEFAULT NULL,
                     train_step INTEGER NOT NULL,
+                    train_commit TEXT DEFAULT NULL,
                     rollout_name TEXT NOT NULL,
                     blackbox TEXT NOT NULL,
                     reward REAL DEFAULT 0.0,
@@ -44,16 +45,18 @@ class RolloutsDB:
         blackbox: str,
         reward: float = 0.0,
         train_run: Optional[int] = None,
+        train_commit: Optional[str] = None,
     ) -> int:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO unboxer.rollouts (train_run, train_step, rollout_name, blackbox, reward)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO unboxer.rollouts (train_run, train_step, train_commit, rollout_name, blackbox, reward)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING id
                 """,
                 train_run,
                 train_step,
+                train_commit,
                 rollout_name,
                 blackbox,
                 reward,

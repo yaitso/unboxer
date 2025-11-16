@@ -71,6 +71,9 @@ def train_unboxer():
 
     load_dotenv()
 
+    import wandb
+    wandb.login(key=os.environ["WANDB_TOKEN"])
+
     os.environ["NCCL_DEBUG"] = "WARN"
     os.environ["NCCL_SOCKET_IFNAME"] = "lo"
 

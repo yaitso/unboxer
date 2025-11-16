@@ -21,8 +21,15 @@ def train(config_path: str = "configs/unboxer.toml") -> dict:
     if "dsn" not in env_args and "POSTGRES" in environ:
         env_args["dsn"] = environ["POSTGRES"]
 
+    if "train_commit" not in env_args and "TRAIN_COMMIT" in environ:
+        env_args["train_commit"] = environ["TRAIN_COMMIT"]
+
     env = vf.load_environment(env_id=env_id, **env_args)
     rl_config = vf.RLConfig(**config["trainer"].get("args", {}))
+
+    if "TRAIN_COMMIT" in environ:
+        rl_config.run_name = environ["TRAIN_COMMIT"]
+
     trainer = vf.RLTrainer(model=model, env=env, args=rl_config)
     trainer.train()
 

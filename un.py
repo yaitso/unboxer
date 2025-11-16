@@ -3,6 +3,7 @@ import click
 from subprocess import run
 from pathlib import Path
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -93,6 +94,34 @@ def setup():
 def train():
     """train unboxer model on modal h100"""
     script_dir = Path(__file__).parent
+
+    run(["git", "add", "."], cwd=script_dir, check=True)
+    run(["git", "commit", "-m", "yaitso"], cwd=script_dir, check=True)
+
+    result = run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=script_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    commit_sha = result.stdout.strip()
+    commit_6_chars = commit_sha[:6]
+
+    env_file = script_dir / ".env"
+    env_text = env_file.read_text()
+    env_text_updated = re.sub(
+        r"^TRAIN_COMMIT=.*$",
+        f"TRAIN_COMMIT={commit_6_chars}",
+        env_text,
+        flags=re.MULTILINE,
+    )
+
+    if "TRAIN_COMMIT=" not in env_text:
+        env_text_updated = env_text_updated.rstrip() + f"\nTRAIN_COMMIT={commit_6_chars}\n"
+
+    env_file.write_text(env_text_updated)
+
     run(
         [
             "uv",
