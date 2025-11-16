@@ -4,12 +4,37 @@ from typing import Optional
 
 
 class RolloutsDB:
-    def __init__(self, migrate: bool = False, dsn: Optional[str] = None):
+    def __init__(self, dsn: Optional[str] = None):
         self.dsn = dsn or environ.get("POSTGRES")
         if not self.dsn:
             raise ValueError("POSTGRES connection string not found in environment")
         self.pool: Optional[asyncpg.Pool] = None
-        self.migrate = migrate
+
+    @staticmethod
+    async def migrate(dsn: Optional[str] = None):
+        """run migration once before training starts"""
+        connection_string = dsn or environ.get("POSTGRES")
+        if not connection_string:
+            raise ValueError("POSTGRES connection string not found in environment")
+
+        conn = await asyncpg.connect(connection_string)
+        try:
+            await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
+            await conn.execute("CREATE SCHEMA unboxer")
+            await conn.execute("""
+                CREATE TABLE unboxer.rollouts (
+                    id SERIAL PRIMARY KEY,
+                    train_run INTEGER DEFAULT NULL,
+                    train_step INTEGER NOT NULL,
+                    train_commit TEXT DEFAULT NULL,
+                    rollout_name TEXT NOT NULL,
+                    blackbox TEXT NOT NULL,
+                    reward REAL DEFAULT 0.0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        finally:
+            await conn.close()
 
     async def connect(self):
         self.pool = await asyncpg.create_pool(self.dsn)
@@ -17,30 +42,21 @@ class RolloutsDB:
         return self
 
     async def init_schema(self):
+        """ensure schema exists (idempotent, no migration)"""
         async with self.pool.acquire() as conn:
-            try:
-                if self.migrate:
-                    await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
-
-                try:
-                    await conn.execute("CREATE SCHEMA unboxer")
-                except asyncpg.exceptions.DuplicateSchemaError:
-                    pass
-
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS unboxer.rollouts (
-                        id SERIAL PRIMARY KEY,
-                        train_run INTEGER DEFAULT NULL,
-                        train_step INTEGER NOT NULL,
-                        train_commit TEXT DEFAULT NULL,
-                        rollout_name TEXT NOT NULL,
-                        blackbox TEXT NOT NULL,
-                        reward REAL DEFAULT 0.0,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-            except Exception as e:
-                print(f"Schema init warning: {e}")
+            await conn.execute("CREATE SCHEMA IF NOT EXISTS unboxer")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS unboxer.rollouts (
+                    id SERIAL PRIMARY KEY,
+                    train_run INTEGER DEFAULT NULL,
+                    train_step INTEGER NOT NULL,
+                    train_commit TEXT DEFAULT NULL,
+                    rollout_name TEXT NOT NULL,
+                    blackbox TEXT NOT NULL,
+                    reward REAL DEFAULT 0.0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
     async def add_rollout(
         self,

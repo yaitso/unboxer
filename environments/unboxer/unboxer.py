@@ -39,7 +39,6 @@ class UnboxerEnv(vf.MultiTurnEnv):
         use_remote: bool = True,
         train_run: Optional[int] = None,
         target_solve_rate: float = 0.4,
-        migrate: bool = False,
         dsn: Optional[str] = None,
         train_commit: Optional[str] = None,
         **kwargs,
@@ -52,7 +51,6 @@ class UnboxerEnv(vf.MultiTurnEnv):
         self.use_remote = use_remote
         self.train_run = train_run
         self.target_solve_rate = target_solve_rate
-        self.migrate = migrate
         self.dsn = dsn or environ.get("POSTGRES")
         self.train_commit = train_commit or environ.get("TRAIN_COMMIT")
         self.db: RolloutsDB = None  # type: ignore
@@ -61,7 +59,7 @@ class UnboxerEnv(vf.MultiTurnEnv):
 
     async def ensure_db(self):
         if not self.db_initialized:
-            self.db = RolloutsDB(migrate=self.migrate, dsn=self.dsn)
+            self.db = RolloutsDB(dsn=self.dsn)
             await self.db.connect()
             if self.train_run is None:
                 self.train_run = await self.db.get_next_train_run()

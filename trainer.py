@@ -4,6 +4,15 @@ import tomllib
 import verifiers as vf
 from os import environ
 from huggingface_hub import HfApi, create_repo
+import asyncio
+
+
+async def run_migration():
+    """run database migration once before training"""
+    from db import RolloutsDB
+    dsn = environ.get("POSTGRES")
+    if dsn:
+        await RolloutsDB.migrate(dsn=dsn)
 
 
 def train(config_path: str = "configs/unboxer.toml") -> dict:
@@ -24,6 +33,8 @@ def train(config_path: str = "configs/unboxer.toml") -> dict:
 
     if "train_commit" not in env_args and "TRAIN_COMMIT" in environ:
         env_args["train_commit"] = environ["TRAIN_COMMIT"]
+
+    asyncio.run(run_migration())
 
     env = vf.load_environment(env_id=env_id, **env_args)
     rl_config = vf.RLConfig(**config["trainer"].get("args", {}))
