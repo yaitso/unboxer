@@ -18,15 +18,14 @@ class RolloutsDB:
 
     async def init_schema(self):
         async with self.pool.acquire() as conn:
-            await conn.execute("SELECT pg_advisory_lock(42)")
-
             try:
                 if self.migrate:
                     await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
 
-                await conn.execute("""
-                    CREATE SCHEMA IF NOT EXISTS unboxer
-                """)
+                try:
+                    await conn.execute("CREATE SCHEMA unboxer")
+                except asyncpg.exceptions.DuplicateSchemaError:
+                    pass
 
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS unboxer.rollouts (
@@ -40,8 +39,8 @@ class RolloutsDB:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
-            finally:
-                await conn.execute("SELECT pg_advisory_unlock(42)")
+            except Exception as e:
+                print(f"Schema init warning: {e}")
 
     async def add_rollout(
         self,
