@@ -40,9 +40,11 @@ class UnboxerEnv(vf.MultiTurnEnv):
         train_run: Optional[int] = None,
         target_solve_rate: float = 0.4,
         migrate: bool = False,
+        dsn: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(max_turns=max_turns, **kwargs)
+        from os import environ
         self.max_turns = max_turns
         self.train_step = train_step
         self.rollouts_per_step = rollouts_per_step
@@ -50,6 +52,7 @@ class UnboxerEnv(vf.MultiTurnEnv):
         self.train_run = train_run
         self.target_solve_rate = target_solve_rate
         self.migrate = migrate
+        self.dsn = dsn or environ.get("POSTGRES")
         self.db: RolloutsDB = None  # type: ignore
         self.db_initialized = False
         self.current_complexity = {"num_ops": 1, "num_holes": 0, "num_args": 1}
