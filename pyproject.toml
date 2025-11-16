@@ -28,9 +28,6 @@ override-dependencies = [
     "flash-attn; platform_system == 'Linux'",
 ]
 
-[tool.uv.extra-build-dependencies]
-flash-attn = ["torch", "packaging", "ninja"]
-
 [tool.setuptools]
 packages = ["environments.unboxer"]
 py-modules = ["un", "sandbox", "db", "prompts", "trainer"]

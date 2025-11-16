@@ -13,7 +13,7 @@ REPO_DIR = f"{VOLUME_DIR}/unboxer"
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
-    .apt_install("git")
+    .apt_install("git", "wget")
     .run_commands("pip install uv")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600"})
 )
@@ -55,6 +55,12 @@ def train_unboxer():
 
     os.chdir(REPO_DIR)
     sys.path.insert(0, REPO_DIR)
+
+    print("installing prebuilt flash-attn wheel...")
+    flash_wheel = "flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
+    flash_url = f"https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/{flash_wheel}"
+    subprocess.run(["wget", "-q", flash_url], check=True)
+    subprocess.run(["uv", "pip", "install", "--no-deps", flash_wheel], check=True)
 
     print("installing dependencies on H100...")
     subprocess.run(["uv", "sync", "--frozen"], check=True)
