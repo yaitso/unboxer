@@ -18,25 +18,30 @@ class RolloutsDB:
 
     async def init_schema(self):
         async with self.pool.acquire() as conn:
-            if self.migrate:
-                await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
+            await conn.execute("SELECT pg_advisory_lock(42)")
 
-            await conn.execute("""
-                CREATE SCHEMA IF NOT EXISTS unboxer
-            """)
+            try:
+                if self.migrate:
+                    await conn.execute("DROP SCHEMA IF EXISTS unboxer CASCADE")
 
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS unboxer.rollouts (
-                    id SERIAL PRIMARY KEY,
-                    train_run INTEGER DEFAULT NULL,
-                    train_step INTEGER NOT NULL,
-                    train_commit TEXT DEFAULT NULL,
-                    rollout_name TEXT NOT NULL,
-                    blackbox TEXT NOT NULL,
-                    reward REAL DEFAULT 0.0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+                await conn.execute("""
+                    CREATE SCHEMA IF NOT EXISTS unboxer
+                """)
+
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS unboxer.rollouts (
+                        id SERIAL PRIMARY KEY,
+                        train_run INTEGER DEFAULT NULL,
+                        train_step INTEGER NOT NULL,
+                        train_commit TEXT DEFAULT NULL,
+                        rollout_name TEXT NOT NULL,
+                        blackbox TEXT NOT NULL,
+                        reward REAL DEFAULT 0.0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            finally:
+                await conn.execute("SELECT pg_advisory_unlock(42)")
 
     async def add_rollout(
         self,
