@@ -33,6 +33,7 @@ class RolloutsDB:
                     solved BOOLEAN DEFAULT FALSE,
                     num_turns INTEGER DEFAULT 0,
                     trajectory JSONB DEFAULT NULL,
+                    logs JSONB DEFAULT '[]'::jsonb,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -65,6 +66,7 @@ class RolloutsDB:
                     solved BOOLEAN DEFAULT FALSE,
                     num_turns INTEGER DEFAULT 0,
                     trajectory JSONB DEFAULT NULL,
+                    logs JSONB DEFAULT '[]'::jsonb,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -124,6 +126,29 @@ class RolloutsDB:
                 json.dumps(trajectory),
                 num_turns,
                 solved,
+                rollout_id,
+            )
+
+    async def append_log(
+        self,
+        rollout_id: int,
+        event: str,
+        data: dict,
+    ):
+        import json
+        from datetime import datetime
+
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event": event,
+            "data": data,
+        }
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE unboxer.rollouts 
+                   SET logs = logs || $1::jsonb 
+                   WHERE id = $2""",
+                json.dumps([log_entry]),
                 rollout_id,
             )
 

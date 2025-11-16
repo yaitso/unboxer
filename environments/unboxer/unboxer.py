@@ -296,6 +296,19 @@ NOT just an expression like "x + 2" — that will fail to execute"""
 
         state["prompt"] = [{"role": "user", "content": game_prompt}]
 
+        await self.db.append_log(
+            rollout_id=state["rollout_id"],
+            event="setup",
+            data={
+                "blackbox": blackbox_fn,
+                "complexity": complexity,
+                "io_pairs": n_input_output_pairs,
+                "next_input": next_data["n_plus_one_input"],
+                "expected_output": next_data["n_plus_one_output"],
+                "budget": self.max_turns,
+            },
+        )
+
         return state
 
     async def is_completed(self, messages: Messages, state: State, **kwargs) -> bool:
@@ -362,6 +375,17 @@ NOT just an expression like "x + 2" — that will fail to execute"""
                     else:
                         results.append({"input": kw, "error": result.err()})
 
+                await self.db.append_log(
+                    rollout_id=state["rollout_id"],
+                    event="eval",
+                    data={
+                        "fn": fn,
+                        "kwargs_count": len(kwargs_list),
+                        "results": results,
+                        "budget_remaining": state["budget"],
+                    },
+                )
+
                 tool_responses.append(
                     {
                         "role": "tool",
@@ -373,6 +397,18 @@ NOT just an expression like "x + 2" — that will fail to execute"""
             elif tool_name == "submit":
                 args = json.loads(tool_call["function"]["arguments"])
                 predicted_output = args["output"]
+                submitted_fn = args.get("fn", "")
+
+                await self.db.append_log(
+                    rollout_id=state["rollout_id"],
+                    event="submit",
+                    data={
+                        "fn": submitted_fn,
+                        "predicted_output": predicted_output,
+                        "expected_output": state["n_plus_one_output"],
+                        "budget_remaining": state["budget"],
+                    },
+                )
 
                 expected = state["n_plus_one_output"]
                 tolerance = 0.5
