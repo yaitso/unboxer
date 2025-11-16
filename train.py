@@ -16,10 +16,11 @@ image = (
     .apt_install("git", "wget")
     .run_commands(
         "pip install uv",
+        "uv venv /opt/venv",
         "wget -q https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
-        "pip install --no-dependencies flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
+        "/opt/venv/bin/pip install --no-dependencies flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl",
     )
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600"})
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "UV_HTTP_TIMEOUT": "600", "PATH": "/opt/venv/bin:$PATH"})
 )
 
 
