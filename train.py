@@ -12,7 +12,6 @@ image = (
     .run_commands("pip install uv")
     .env(
         {
-            "HF_HUB_ENABLE_HF_TRANSFER": "1",
             "UV_HTTP_TIMEOUT": "600",
             "PATH": "/usr/local/cuda-12.8/bin:$PATH",
             "LD_LIBRARY_PATH": "/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH",
