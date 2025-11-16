@@ -5,6 +5,7 @@ app = modal.App("unboxer")
 openrouter = modal.Secret.from_name("openrouter")
 fly_api = modal.Secret.from_name("fly-api")
 postgres = modal.Secret.from_name("postgres")
+github = modal.Secret.from_name("github")
 
 volume = modal.Volume.from_name("unboxer-volume", create_if_missing=True)
 VOLUME_DIR = "/root/volume"
@@ -22,7 +23,7 @@ image = (
     gpu="H100",
     image=image,
     volumes={VOLUME_DIR: volume},
-    secrets=[openrouter, fly_api, postgres],
+    secrets=[openrouter, fly_api, postgres, github],
     timeout=14400,
 )
 def train_unboxer():
@@ -34,18 +35,9 @@ def train_unboxer():
     os.environ["PATH"] = f"/usr/local/cuda-12.8/bin:{os.environ.get('PATH', '')}"
     os.environ["LD_LIBRARY_PATH"] = f"/usr/local/cuda-12.8/lib64:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
-    env_file = Path(f"{VOLUME_DIR}/.env")
-    if not env_file.exists():
-        raise FileNotFoundError(f"missing .env file at {env_file}")
-
-    gh_token = None
-    for line in env_file.read_text().splitlines():
-        if line.startswith("GH_TOKEN="):
-            gh_token = line.split("=", 1)[1].strip()
-            break
-
+    gh_token = os.environ.get("GH_TOKEN")
     if not gh_token:
-        raise ValueError("GH_TOKEN not found in .env")
+        raise ValueError("GH_TOKEN not found in environment")
 
     repo_path = Path(REPO_DIR)
     if not repo_path.exists():
