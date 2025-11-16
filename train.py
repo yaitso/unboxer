@@ -57,6 +57,9 @@ def train_unboxer():
     os.chdir(REPO_DIR)
     sys.path.insert(0, REPO_DIR)
 
+    print("creating venv...")
+    subprocess.run(["uv", "venv", ".venv"], check=True)
+
     print("installing prebuilt flash-attn wheel...")
     flash_wheel = "flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
     flash_url = f"https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/{flash_wheel}"
